@@ -70,6 +70,12 @@ from ..utils import validate_config_path
 
 class VannaBase(ABC):
     def __init__(self, config=None):
+        self.language = "SQL or Python (verticapy)"
+        self.preference = """Give preference to Python code for statistical functions such as correlation. 
+        When providing verticapy code, assume the connection is already made. 
+        When providing verticapy code, always read data as ```vp.vDataFrame(<name of table>)```. Do not use ```vp.read``` or ```vp.read_csv``` etc.
+        When providing verticapy code, always provide store the final answer in a variable called ans e.g. ```ans = vdf.corr()``` or ```ans = vdf["age"]```.
+        When providing python code, mention it in codeblock.""" if "Python" in self.language else ""
         self.config = config
         self.run_sql_is_set = False
         self.static_documentation = ""
@@ -146,6 +152,13 @@ class VannaBase(ABC):
         if sql:
             self.log(f"Output from LLM: {llm_response} \nExtracted SQL: {sql.group(1)}")
             return sql.group(1)
+
+        # If the llm_response contains a markdown code block for Python, extract the Python code from it
+        python_code = re.search(r"```python\n(.*)```", llm_response, re.DOTALL)
+        if python_code:
+            print("Found this pattern")
+            self.log(f"Output from LLM: {llm_response} \nExtracted Python code: {python_code.group(1)}")
+            return python_code.group(1)
 
         return llm_response
 
@@ -456,7 +469,10 @@ class VannaBase(ABC):
         """
 
         if initial_prompt is None:
-            initial_prompt = "The user provides a question and you provide SQL. You will only respond with SQL code and not with any explanations.\n\nRespond with only SQL code. Do not answer with any explanations -- just the code.\n"
+            initial_prompt = f"""
+            The user provides a question and you provide {self.language}. 
+            You will only respond with {self.language} code and not with any explanations {self.preference}.\n\nRespond with only {self.language} code. 
+            Do not answer with any explanations -- just the code.\n"""
 
         initial_prompt = self.add_ddl_to_prompt(
             initial_prompt, ddl_list, max_tokens=14000
@@ -1256,8 +1272,9 @@ class VannaBase(ABC):
                 return sql, None, None
 
         try:
+            print("TEST HERE")
             df = self.run_sql(sql)
-
+            print("DONE??")
             if print_results:
                 try:
                     display = __import__(
@@ -1266,19 +1283,24 @@ class VannaBase(ABC):
                     display(df)
                 except Exception as e:
                     print(df)
-
-            if len(df) > 0 and auto_train:
-                self.add_question_sql(question=question, sql=sql)
+            if type(df) is not plotly.graph_objs._figure.Figure:
+                if len(df) > 0 and auto_train:
+                    self.add_question_sql(question=question, sql=sql)
             # Only generate plotly code if visualize is True
             if visualize:
                 try:
-                    plotly_code = self.generate_plotly_code(
-                        question=question,
-                        sql=sql,
-                        df_metadata=f"Running df.dtypes gives:\n {df.dtypes}",
-                    )
-                    fig = self.get_plotly_figure(plotly_code=plotly_code, df=df)
+                    if type(df) == plotly.graph_objs._figure.Figure:
+                        print("Correct Type Caught")
+                        fig = df
+                    else:
+                        plotly_code = self.generate_plotly_code(
+                            question=question,
+                            sql=sql,
+                            df_metadata=f"Running df.dtypes gives:\n {df.dtypes}",
+                        )
+                        fig = self.get_plotly_figure(plotly_code=plotly_code, df=df)
                     if print_results:
+                        print("Trying to print result")
                         try:
                             display = __import__(
                                 "IPython.display", fromlist=["display"]
