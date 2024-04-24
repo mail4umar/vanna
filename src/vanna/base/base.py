@@ -1601,7 +1601,7 @@ class VannaBase(ABC):
         return plan
 
     def get_plotly_figure(
-        self, plotly_code: str, df: pd.DataFrame, dark_mode: bool = True
+        self, plotly_code: str, df: pd.DataFrame, dark_mode: bool = True, sql: str = None
     ) -> plotly.graph_objs.Figure:
         """
         **Example:**
@@ -1623,9 +1623,11 @@ class VannaBase(ABC):
         """
         ldict = {"df": df, "px": px, "go": go}
         try:
-            exec(plotly_code, globals(), ldict)
-
-            fig = ldict.get("fig", None)
+            if df == "":
+                fig = self.run_sql(sql)
+            else:
+                exec(plotly_code, globals(), ldict)
+                fig = ldict.get("fig", None)
         except Exception as e:
             # Inspect data types
             numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()

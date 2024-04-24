@@ -3,6 +3,7 @@ import uuid
 from abc import ABC, abstractmethod
 from functools import wraps
 
+import plotly
 import flask
 import requests
 from flask import Flask, Response, jsonify, request
@@ -135,8 +136,8 @@ class VannaFlaskApp:
                     auth: AuthInterface = NoAuth(),
                     allow_llm_to_see_data=False,
                     logo="https://img.vanna.ai/vanna-flask.svg",
-                    title="Welcome to Vanna.AI",
-                    subtitle="Your AI-powered copilot for SQL queries.",
+                    title="Welcome to OTCAD Bot",
+                    subtitle="Your AI-powered copilot for OTCAD SQL queries.",
                     show_training_data=True,
                     suggested_questions=True,
                     sql=True,
@@ -338,7 +339,7 @@ class VannaFlaskApp:
                     {
                         "type": "df",
                         "id": id,
-                        "df": df.head(10).to_json(orient='records', date_format='iso'),
+                        "df": df.head(10).to_json(orient="records", date_format="iso") if type(df) is not plotly.graph_objs._figure.Figure else "",
                     }
                 )
 
@@ -414,7 +415,7 @@ class VannaFlaskApp:
                     sql=sql,
                     df_metadata=f"Running df.dtypes gives:\n {df.dtypes}",
                 )
-                fig = vn.get_plotly_figure(plotly_code=code, df=df, dark_mode=False)
+                fig = vn.get_plotly_figure(plotly_code=code, df=df, dark_mode=False, sql = sql)
                 fig_json = fig.to_json()
 
                 self.cache.set(id=id, field="fig_json", value=fig_json)
@@ -560,7 +561,7 @@ class VannaFlaskApp:
                         "id": id,
                         "question": question,
                         "sql": sql,
-                        "df": df.head(10).to_json(orient="records", date_format="iso"),
+                        "df": df.head(10).to_json(orient="records", date_format="iso") if type(df) is not plotly.graph_objs._figure.Figure else "",
                         "fig": fig_json,
                         "summary": summary,
                     }
