@@ -56,6 +56,7 @@ import traceback
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Union
 from urllib.parse import urlparse
+import textwrap
 
 import pandas as pd
 import plotly
@@ -1283,22 +1284,17 @@ class VannaBase(ABC):
                     display(df)
                 except Exception as e:
                     print(df)
-            if type(df) is not plotly.graph_objs._figure.Figure:
-                if len(df) > 0 and auto_train:
-                    self.add_question_sql(question=question, sql=sql)
+            if len(df) > 0 and auto_train:
+                self.add_question_sql(question=question, sql=sql)
             # Only generate plotly code if visualize is True
             if visualize:
                 try:
-                    if type(df) == plotly.graph_objs._figure.Figure:
-                        print("Correct Type Caught")
-                        fig = df
-                    else:
-                        plotly_code = self.generate_plotly_code(
-                            question=question,
-                            sql=sql,
-                            df_metadata=f"Running df.dtypes gives:\n {df.dtypes}",
-                        )
-                        fig = self.get_plotly_figure(plotly_code=plotly_code, df=df)
+                    plotly_code = self.generate_plotly_code(
+                        question=question,
+                        sql=sql,
+                        df_metadata=f"Running df.dtypes gives:\n {df.dtypes}",
+                    )
+                    fig = self.get_plotly_figure(plotly_code=plotly_code, df=df)
                     if print_results:
                         print("Trying to print result")
                         try:
@@ -1600,6 +1596,7 @@ class VannaBase(ABC):
 
         return plan
 
+
     def get_plotly_figure(
         self, plotly_code: str, df: pd.DataFrame, dark_mode: bool = True, sql: str = None
     ) -> plotly.graph_objs.Figure:
@@ -1623,8 +1620,9 @@ class VannaBase(ABC):
         """
         ldict = {"df": df, "px": px, "go": go}
         try:
-            if df == "":
-                fig = self.run_sql(sql)
+            if "python" in sql or "verticapy" in sql:
+                print("Caught SQL having python. Creating Figure from plotly!!!!!!!!!! WTH!!!")
+                return get_plotly_from_verticapy(sql)
             else:
                 exec(plotly_code, globals(), ldict)
                 fig = ldict.get("fig", None)
@@ -1656,3 +1654,29 @@ class VannaBase(ABC):
             fig.update_layout(template="plotly_dark")
 
         return fig
+
+
+def extract_python_code(input_str):
+    # Regular expression pattern to match Python code block
+    print("inside extract python code")
+    pattern = r"^python\s*(.*?)\n*$"
+    match = re.search(pattern, input_str, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    else:
+        return input_str
+
+
+def get_plotly_from_verticapy(sql: str):
+    """
+    """
+    print("musseeeebat")
+    exec_global_var = {}
+    exec_local_var = {}
+    python_code = extract_python_code(sql)
+    python_code = textwrap.dedent(python_code)
+    print("AE LO python...:", python_code)
+    exec(python_code, exec_global_var, exec_local_var)
+    print(exec_local_var.get('ans'))
+    print(type(exec_local_var.get('ans')))
+    return exec_local_var.get('ans')

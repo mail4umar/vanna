@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from functools import wraps
 
 import plotly
+import json
 import flask
 import requests
 from flask import Flask, Response, jsonify, request
@@ -400,6 +401,35 @@ class VannaFlaskApp:
                 headers={"Content-disposition": f"attachment; filename={id}.csv"},
             )
 
+
+        def extract_values(json_str, keys_to_extract):
+            try:
+                # Parse the JSON string into a Python dictionary
+                data = json.loads(json_str)
+                
+                # Initialize an empty dictionary to store the extracted values
+                extracted_dict = {}
+                
+                # Iterate over the keys to extract
+                for key_to_extract in keys_to_extract:
+                    # Check if the key exists in the dictionary
+                    if key_to_extract in data:
+                        # Add the key and its associated values to the extracted dictionary
+                        extracted_dict[key_to_extract] = data[key_to_extract]
+                
+                # Convert the dictionary to a JSON-formatted string
+                extracted_json = json.dumps(extracted_dict)
+                
+                # Ensure that the output matches the input quotation style
+                if json_str.startswith('"') and json_str.endswith('"'):
+                    extracted_json = '"' + extracted_json[1:-1] + '"'
+                
+                return extracted_json
+            except Exception as e:
+                print("An error occurred:", e)
+                return None
+
+
         @self.flask_app.route("/api/v0/generate_plotly_figure", methods=["GET"])
         @self.requires_auth
         @self.requires_cache(["df", "question", "sql"])
@@ -415,9 +445,14 @@ class VannaFlaskApp:
                     sql=sql,
                     df_metadata=f"Running df.dtypes gives:\n {df.dtypes}",
                 )
+                print("plotly CODE is:", code)
                 fig = vn.get_plotly_figure(plotly_code=code, df=df, dark_mode=False, sql = sql)
                 fig_json = fig.to_json()
-
+                print("type of json BEFORE:", type(fig_json))
+                print("the original json is:", fig_json)
+                fig_json = extract_values(fig_json, ["data","layout"])
+                print("type of json AFTER:", type(fig_json))
+                print("FINAL JSON:",fig_json)
                 self.cache.set(id=id, field="fig_json", value=fig_json)
 
                 return jsonify(
